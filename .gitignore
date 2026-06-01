@@ -1,0 +1,23 @@
+# 민감 정보 / 로컬 설정
+*.env
+.env
+*.key
+secrets.*
+appsettings.local.json
+
+# 평가 결과 / 데이터
+eval_result.json
+*.jsonl
+!**/sample*.jsonl
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

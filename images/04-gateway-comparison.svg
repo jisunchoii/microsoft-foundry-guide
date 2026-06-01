@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="620" viewBox="0 0 1280 620" role="img" aria-labelledby="title desc">
+  <title id="title">APIM AI 게이트웨이 도입 전후 비교</title>
+  <desc id="desc">게이트웨이 없이 각 클라이언트가 Foundry를 직접 호출하는 구조와 APIM AI 게이트웨이를 통해 중앙 통제하는 구조를 비교한 다이어그램</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.12" />
+    </filter>
+    <style>
+      .bg { fill: #f8fafc; }
+      .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; filter: url(#shadow); }
+      .panel-title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 17px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .box { fill: #eff6ff; stroke: #93c5fd; stroke-width: 2; rx: 14; }
+      .box-client { fill: #f8fafc; stroke: #94a3b8; stroke-width: 2; rx: 12; }
+      .box-risk { fill: #fff7ed; stroke: #fdba74; stroke-width: 2; rx: 14; }
+      .box-gateway { fill: #ecfeff; stroke: #22d3ee; stroke-width: 3; rx: 16; }
+      .box-backend { fill: #eef2ff; stroke: #818cf8; stroke-width: 2; rx: 14; }
+      .label { font: 600 18px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .small { font: 500 15px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .muted { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #64748b; }
+      .risk { font: 600 15px 'Segoe UI', Arial, sans-serif; fill: #9a3412; }
+      .benefit { font: 600 15px 'Segoe UI', Arial, sans-serif; fill: #155e75; }
+      .arrow { stroke: #2563eb; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .arrow-muted { stroke: #64748b; stroke-width: 2.5; fill: none; marker-end: url(#arrow-muted); }
+      .divider { stroke: #cbd5e1; stroke-width: 2; stroke-dasharray: 8 8; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="620" />
+  <text x="640" y="52" text-anchor="middle" class="panel-title">왜 APIM AI 게이트웨이를 두나?</text>
+  <text x="640" y="84" text-anchor="middle" class="subtitle">분산된 직접 호출을 중앙 진입점으로 모아 인증, 비용, 관측 가능성을 일관되게 강제합니다</text>
+
+  <rect class="panel" x="50" y="120" width="560" height="440" />
+  <rect class="panel" x="670" y="120" width="560" height="440" />
+  <line class="divider" x1="640" y1="125" x2="640" y2="555" />
+
+  <text x="330" y="164" text-anchor="middle" class="panel-title">게이트웨이 없이</text>
+  <text x="330" y="194" text-anchor="middle" class="subtitle">각 호출 주체가 Foundry를 직접 호출</text>
+
+  <rect class="box-client" x="90" y="230" width="140" height="52" />
+  <text x="160" y="263" text-anchor="middle" class="label">앱 A</text>
+
+  <rect class="box-client" x="90" y="310" width="140" height="52" />
+  <text x="160" y="343" text-anchor="middle" class="label">앱 B</text>
+
+  <rect class="box-client" x="90" y="390" width="140" height="52" />
+  <text x="160" y="423" text-anchor="middle" class="label">Copilot</text>
+
+  <rect class="box-backend" x="390" y="298" width="170" height="78" />
+  <text x="475" y="329" text-anchor="middle" class="label">Foundry</text>
+  <text x="475" y="354" text-anchor="middle" class="small">직접 호출</text>
+
+  <path class="arrow-muted" d="M 230 256 C 290 256, 320 312, 390 320" />
+  <path class="arrow-muted" d="M 230 336 L 390 336" />
+  <path class="arrow-muted" d="M 230 416 C 290 416, 320 360, 390 352" />
+
+  <rect class="box-risk" x="105" y="478" width="440" height="48" />
+  <text x="325" y="498" text-anchor="middle" class="risk">각자 키 관리 · 통제 분산 · 사용량 추적 어려움</text>
+  <text x="325" y="518" text-anchor="middle" class="muted">앱/팀별 정책을 호출 지점마다 따로 구현해야 함</text>
+
+  <text x="950" y="164" text-anchor="middle" class="panel-title">게이트웨이 도입 후</text>
+  <text x="950" y="194" text-anchor="middle" class="subtitle">APIM에서 모든 LLM 호출을 중앙 통제</text>
+
+  <rect class="box-client" x="710" y="230" width="130" height="52" />
+  <text x="775" y="263" text-anchor="middle" class="label">앱 A</text>
+
+  <rect class="box-client" x="710" y="310" width="130" height="52" />
+  <text x="775" y="343" text-anchor="middle" class="label">앱 B</text>
+
+  <rect class="box-client" x="710" y="390" width="130" height="52" />
+  <text x="775" y="423" text-anchor="middle" class="label">Copilot</text>
+
+  <rect class="box-gateway" x="920" y="270" width="165" height="132" />
+  <text x="1002" y="312" text-anchor="middle" class="label">APIM</text>
+  <text x="1002" y="340" text-anchor="middle" class="label">AI 게이트웨이</text>
+  <text x="1002" y="371" text-anchor="middle" class="benefit">정책 강제</text>
+
+  <rect class="box-backend" x="1110" y="298" width="90" height="78" />
+  <text x="1155" y="329" text-anchor="middle" class="label">Foundry</text>
+  <text x="1155" y="354" text-anchor="middle" class="small">배포</text>
+
+  <path class="arrow" d="M 840 256 C 875 256, 890 300, 920 310" />
+  <path class="arrow" d="M 840 336 L 920 336" />
+  <path class="arrow" d="M 840 416 C 875 416, 890 372, 920 362" />
+  <path class="arrow" d="M 1085 336 L 1110 336" />
+
+  <rect class="box" x="725" y="478" width="460" height="52" />
+  <text x="955" y="499" text-anchor="middle" class="benefit">토큰 한도 · 메트릭 · 캐싱 · 로드밸런싱</text>
+  <text x="955" y="520" text-anchor="middle" class="muted">인증, 로깅, 콘텐츠 안전을 한 곳에서 적용</text>
+</svg>
