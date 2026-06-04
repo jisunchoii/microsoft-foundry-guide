@@ -1,48 +1,48 @@
-# 03. Copilot에서 Foundry 모델 호출하기 (BYOK)
+# 03. Calling Foundry Models from Copilot (BYOK)
 
-VS Code Copilot Chat과 GitHub Copilot CLI에서 Foundry 또는 APIM 경유 모델을 호출하는 방법을 정리합니다.
+This document covers how to call Foundry models — or models routed through APIM — from VS Code Copilot Chat and the GitHub Copilot CLI.
 
-## 이 문서에서 다루는 내용
+## What this document covers
 
-- VS Code Copilot Chat BYOK 모델 추가
-- GitHub Copilot CLI custom provider 설정
-- API key와 Entra ID bearer token 사용 차이
-- APIM 게이트웨이를 경유한 운영 전환 방식
+- Adding a BYOK model in VS Code Copilot Chat
+- Configuring a custom provider in the GitHub Copilot CLI
+- The difference between using an API key and an Entra ID bearer token
+- Moving to production through an APIM gateway
 
-## 0. 사전 준비 (공통)
+## 0. Prerequisites (common)
 
-- **엔드포인트 URL**: 직접 연결 시 `https://<리소스이름>.openai.azure.com` 또는 `https://<리소스이름>.services.ai.azure.com/openai/v1`을 사용합니다. 운영 전환 후에는 APIM 게이트웨이 URL을 사용합니다.
-- **배포 이름**: 예: `my-gpt4o-prod`. Copilot 설정에서는 모델 ID처럼 사용합니다.
-- **모델 요건**: **툴 호출(tool calling) + 스트리밍** 지원 필수. 컨텍스트 윈도우는 **128k 이상 권장**입니다.
-- **인증 방식**: VS Code Copilot Chat은 Azure provider에서 Entra ID 구성이 가능하고, Copilot CLI의 custom provider는 API key 또는 bearer token 환경 변수를 사용합니다.
+- **Endpoint URL**: For a direct connection, use `https://<resource-name>.openai.azure.com` or `https://<resource-name>.services.ai.azure.com/openai/v1`. After moving to production, use the APIM gateway URL.
+- **Deployment name**: e.g., `my-gpt4o-prod`. In Copilot settings it's used like a model ID.
+- **Model requirements**: **tool calling + streaming** support is required. A context window of **128k or more is recommended**.
+- **Authentication**: VS Code Copilot Chat can configure Entra ID in the Azure provider, while the Copilot CLI's custom provider uses an API key or bearer token environment variable.
 
-권장 인증 방식은 호출 주체별로 다릅니다.
+The recommended authentication method differs by who is making the call.
 
-- **앱/서비스 코드**: [02. API 호출](02-api-calls.md)의 운영 권장 방식처럼 **Entra ID / Managed Identity**를 사용합니다.
-- **VS Code Copilot Chat**: **Entra ID 가능**, API key도 가능합니다. VS Code BYOK의 Azure provider 예시는 Entra ID 인증 구성을 보여줍니다.
-- **GitHub Copilot CLI**: **API key 또는 Entra ID bearer token**을 사용합니다. 공식 BYOK 문서는 API key 예시를 중심으로 설명하지만, CLI 도움말과 실제 테스트 기준 `COPILOT_PROVIDER_BEARER_TOKEN`도 지원합니다.
+- **App/service code**: Use **Entra ID / Managed Identity**, like the production-recommended approach in [02. API Calls](02-api-calls.md).
+- **VS Code Copilot Chat**: **Entra ID is possible**, and an API key works too. The VS Code BYOK Azure provider example shows an Entra ID auth configuration.
+- **GitHub Copilot CLI**: Uses an **API key or Entra ID bearer token**. The official BYOK docs focus on API key examples, but based on the CLI help and actual testing, `COPILOT_PROVIDER_BEARER_TOKEN` is also supported.
 
-> 에이전트 모드(파일 편집/툴 실행)로 쓰려면 모델이 반드시 **tool calling**을 지원해야 합니다 (예: gpt-4o, gpt-4.1).
+> To use it in agent mode (file editing/tool execution), the model must support **tool calling** (e.g., gpt-4o, gpt-4.1).
 
 ## Part A. VS Code Copilot Chat
 
-### A-1. 추가 순서
+### A-1. Steps to add
 
-1. Copilot **Chat** 창을 엽니다.
-2. **모델 선택기** → **톱니 / Manage Models** 아이콘 (또는 명령 팔레트 `Ctrl+Shift+P` → **"Chat: Manage Language Models"**)
+1. Open the Copilot **Chat** window.
+2. **Model selector** → **gear / Manage Models** icon (or the command palette `Ctrl+Shift+P` → **"Chat: Manage Language Models"**)
 ![ghcp-01](../images/ghcp-01.png)
 
-3. **Add Models** → 공급자로 **Azure** 선택
+3. **Add Models** → choose **Azure** as the provider
 ![ghcp-02](../images/ghcp-02.png)
 
-4. **그룹 이름** 입력 → **엔드포인트 URL** 과 인증 정보 입력
-5. VS Code가 `chatLanguageModels.json`을 열어 모델 속성 설정(`id`, `name`, `url`, 툴 호출/비전/토큰 한도 등)
-6. 저장 → Azure 모델이 **모델 선택기에 표시**됩니다.
+4. Enter a **group name** → enter the **endpoint URL** and authentication info
+5. VS Code opens `chatLanguageModels.json` to set model properties (`id`, `name`, `url`, tool calling/vision/token limits, etc.)
+6. Save → the Azure model **appears in the model selector**.
 ![ghcp-03](../images/ghcp-03.png)
 
-### A-2. `chatLanguageModels.json` 예시
+### A-2. `chatLanguageModels.json` example
 
-아래 예시는 VS Code 공식 문서의 Azure provider 형식입니다. `apiKey` 필드를 두지 않고 Azure provider가 Entra ID 인증으로 Azure OpenAI/Foundry 배포를 호출하는 구성을 기준으로 합니다.
+The example below follows the Azure provider format from the official VS Code docs. It is based on a configuration where there is no `apiKey` field and the Azure provider calls the Azure OpenAI/Foundry deployment with Entra ID authentication.
 
 ```jsonc
 [
@@ -52,8 +52,8 @@ VS Code Copilot Chat과 GitHub Copilot CLI에서 Foundry 또는 APIM 경유 모�
     "models": [
       {
         "id": "my-gpt4o-prod",
-        "name": "Foundry GPT-4o (사내)",
-        "url": "https://<리소스이름>.openai.azure.com",
+        "name": "Foundry GPT-4o (internal)",
+        "url": "https://<resource-name>.openai.azure.com",
         "toolCalling": true,
         "vision": true,
         "maxInputTokens": 128000,
@@ -64,25 +64,25 @@ VS Code Copilot Chat과 GitHub Copilot CLI에서 Foundry 또는 APIM 경유 모�
 ]
 ```
 
-> BYOK 기능 범위·가용성은 Copilot 요금제에 따라 다를 수 있습니다(VS Code 문서 기준).
+> BYOK feature scope and availability may vary by Copilot plan (per the VS Code docs).
 
 ## Part B. GitHub Copilot CLI
 
-GitHub Copilot CLI는 GitHub 호스팅 모델 대신 **자체 모델 공급자**를 쓰도록 설정할 수 있습니다. 지원: **Azure OpenAI**, OpenAI 호환 엔드포인트(Ollama·vLLM 포함), Anthropic.
+The GitHub Copilot CLI can be configured to use **its own model provider** instead of GitHub-hosted models. Supported: **Azure OpenAI**, OpenAI-compatible endpoints (including Ollama and vLLM), and Anthropic.
 
-공식 BYOK 문서는 주로 `COPILOT_PROVIDER_API_KEY` 예시를 안내하지만, 현재 CLI의 `copilot help providers` 기준으로는 `COPILOT_PROVIDER_BEARER_TOKEN`도 지원합니다. 즉, VS Code Azure provider처럼 로그인 상태를 자동 재사용하는 방식은 아니지만, Azure CLI로 발급받은 Entra ID access token을 bearer token으로 넣어 Foundry 엔드포인트를 호출할 수 있습니다.
+The official BYOK docs mostly show `COPILOT_PROVIDER_API_KEY` examples, but per the current CLI's `copilot help providers`, `COPILOT_PROVIDER_BEARER_TOKEN` is also supported. In other words, unlike the VS Code Azure provider it does not automatically reuse your login state, but you can call a Foundry endpoint by putting an Entra ID access token issued via the Azure CLI into the bearer token.
 
-실제 검증 결과, `Kimi-K2.6-1` 배포는 API key 없이 원격 Foundry 엔드포인트를 호출하면 401이 발생했고, `az account get-access-token`으로 받은 토큰을 `COPILOT_PROVIDER_BEARER_TOKEN`에 넣으면 정상 응답했습니다.
+In actual testing, calling the remote Foundry endpoint for the `Kimi-K2.6-1` deployment without an API key returned a 401, while putting a token obtained from `az account get-access-token` into `COPILOT_PROVIDER_BEARER_TOKEN` returned a normal response.
 
-### B-1. 환경 변수로 설정
+### B-1. Configure with environment variables
 
-- `COPILOT_PROVIDER_TYPE`: Azure OpenAI native endpoint는 `azure`, Foundry `/openai/v1` 호환 엔드포인트는 `openai`를 사용합니다.
-- `COPILOT_PROVIDER_BASE_URL`: 예: `https://<리소스이름>.services.ai.azure.com/openai/v1` 또는 `https://<리소스이름>.openai.azure.com/openai/v1`
-- `COPILOT_PROVIDER_API_KEY`: API key 방식일 때 사용합니다.
-- `COPILOT_PROVIDER_BEARER_TOKEN`: Entra ID bearer token 방식일 때 사용합니다. API key보다 우선 적용됩니다.
-- `COPILOT_MODEL`: 배포 이름을 넣습니다. 예: `my-gpt4o-prod`, `Kimi-K2.6-1`
+- `COPILOT_PROVIDER_TYPE`: Use `azure` for an Azure OpenAI native endpoint, and `openai` for a Foundry `/openai/v1`-compatible endpoint.
+- `COPILOT_PROVIDER_BASE_URL`: e.g., `https://<resource-name>.services.ai.azure.com/openai/v1` or `https://<resource-name>.openai.azure.com/openai/v1`
+- `COPILOT_PROVIDER_API_KEY`: Used with the API key method.
+- `COPILOT_PROVIDER_BEARER_TOKEN`: Used with the Entra ID bearer token method. Takes precedence over the API key.
+- `COPILOT_MODEL`: Put the deployment name here. e.g., `my-gpt4o-prod`, `Kimi-K2.6-1`
 
-**bash / zsh (macOS·Linux) - Entra ID bearer token 방식**:
+**bash / zsh (macOS·Linux) - Entra ID bearer token method**:
 
 ```bash
 export COPILOT_PROVIDER_BEARER_TOKEN=$(az account get-access-token \
@@ -96,13 +96,13 @@ export COPILOT_MODEL="Kimi-K2.6-1"
 copilot
 ```
 
-**bash / zsh (macOS·Linux) - API key 방식**:
+**bash / zsh (macOS·Linux) - API key method**:
 
 ```bash
 export COPILOT_PROVIDER_TYPE="openai"
-export COPILOT_PROVIDER_BASE_URL="https://<리소스이름>.services.ai.azure.com/openai/v1"
+export COPILOT_PROVIDER_BASE_URL="https://<resource-name>.services.ai.azure.com/openai/v1"
 export COPILOT_PROVIDER_API_KEY="<API_KEY>"
-export COPILOT_MODEL="<배포이름>"
+export COPILOT_MODEL="<deployment-name>"
 
 copilot
 ```
@@ -110,51 +110,51 @@ copilot
 ![ghcp-04](../images/ghcp-04.png)
 ![ghcp-05](../images/ghcp-05.png)
 
-> `copilot help providers` 로 현재 설정과 지원 공급자를 확인할 수 있습니다. 이 도움말에는 `COPILOT_PROVIDER_BEARER_TOKEN`이 API key보다 우선 적용된다고 설명되어 있습니다.
+> Run `copilot help providers` to check the current configuration and supported providers. This help explains that `COPILOT_PROVIDER_BEARER_TOKEN` takes precedence over the API key.
 
-> bearer token은 만료 시간이 짧습니다. 새 터미널을 열었거나 토큰이 만료되면 `az account get-access-token`으로 다시 발급받아야 합니다.
+> Bearer tokens expire quickly. If you open a new terminal or the token expires, you must reissue it with `az account get-access-token`.
 
-> `COPILOT_PROVIDER_API_KEY`와 `COPILOT_PROVIDER_BEARER_TOKEN`을 동시에 설정하지 마세요. 테스트할 때는 쓰지 않는 값을 `unset COPILOT_PROVIDER_API_KEY`처럼 제거하면 혼동을 줄일 수 있습니다.
+> Don't set `COPILOT_PROVIDER_API_KEY` and `COPILOT_PROVIDER_BEARER_TOKEN` at the same time. When testing, removing the unused value with something like `unset COPILOT_PROVIDER_API_KEY` reduces confusion.
 
-### B-2. 모델 목록에 보이지 않는 이유
+### B-2. Why it doesn't appear in the model list
 
-BYOK 모델은 GitHub 호스팅 모델 카탈로그에 등록되는 것이 아니라, 환경 변수로 지정한 provider와 model을 현재 CLI 세션에 적용하는 방식입니다. 따라서 `Kimi-K2.6-1` 같은 Foundry 배포 이름은 `/model` 목록에 표시되지 않을 수 있습니다.
+A BYOK model is not registered in the GitHub-hosted model catalog; instead, the provider and model specified via environment variables are applied to the current CLI session. As a result, a Foundry deployment name like `Kimi-K2.6-1` may not appear in the `/model` list.
 
-대신 다음 중 하나로 모델을 지정합니다.
+Instead, specify the model in one of these ways.
 
-- `COPILOT_MODEL=<배포이름>`
-- `COPILOT_PROVIDER_MODEL_ID=<잘 알려진 기준 모델 ID>` + `COPILOT_PROVIDER_WIRE_MODEL=<실제 provider에 보낼 배포 이름>`
-- 실행 시 `--model <배포이름>`
+- `COPILOT_MODEL=<deployment-name>`
+- `COPILOT_PROVIDER_MODEL_ID=<a well-known reference model ID>` + `COPILOT_PROVIDER_WIRE_MODEL=<the actual deployment name to send to the provider>`
+- `--model <deployment-name>` at runtime
 
-`COPILOT_MODEL`은 내부 모델 ID와 provider에 전달할 wire model 이름을 모두 같은 값으로 설정하는 가장 단순한 방식입니다.
+`COPILOT_MODEL` is the simplest method, setting both the internal model ID and the wire model name passed to the provider to the same value.
 
-### B-3. 모델 전환
+### B-3. Switching models
 
-- GitHub 호스팅 모델은 세션 중 `/model` 슬래시 명령으로 바꿉니다.
-- BYOK 모델은 환경 변수(`COPILOT_MODEL`, `COPILOT_PROVIDER_WIRE_MODEL`)로 지정하는 것이 가장 명확합니다.
-- 실행 시 `--model <배포이름>` 옵션으로도 지정할 수 있습니다.
+- Switch GitHub-hosted models during a session with the `/model` slash command.
+- For BYOK models, specifying them via environment variables (`COPILOT_MODEL`, `COPILOT_PROVIDER_WIRE_MODEL`) is the clearest approach.
+- You can also specify it with the `--model <deployment-name>` option at runtime.
 
-### B-4. 요건
+### B-4. Requirements
 
-- 커스텀 모델은 **tool calling(함수 호출) + 스트리밍**을 지원해야 합니다.
-- 컨텍스트 윈도우 **128k 이상 권장**.
+- A custom model must support **tool calling (function calling) + streaming**.
+- A context window of **128k or more is recommended**.
 
-## Part C. 운영 전환 — APIM 게이트웨이를 거쳐 연결
+## Part C. Moving to production — connecting through an APIM gateway
 
-VS Code Copilot이든 Copilot CLI든, 운영 환경에서는 엔드포인트를 **Foundry 직결 대신 [04. 전체 API 호출 거버닝 아키텍처](04-api-governance-architecture.md)의 APIM 엔드포인트**로 지정하세요.
+For both VS Code Copilot and the Copilot CLI, in production point the endpoint at the **APIM endpoint from [04. End-to-End API Call Governance Architecture](04-api-governance-architecture.md) instead of connecting directly to Foundry**.
 
-![Copilot 호출 운영 전환 흐름](../images/03-copilot-apim-governance-flow.svg)
+![Copilot call production transition flow](../images/03-copilot-apim-governance-flow.svg)
 
-→ **앱의 API 호출과 개발자의 Copilot 사용량까지** 같은 토큰 한도·메트릭·로깅에 포함되어 전사 거버넌스가 일관됩니다.
+→ **Both your app's API calls and developers' Copilot usage** are included in the same token limits, metrics, and logging, keeping company-wide governance consistent.
 
-- VS Code: `chatLanguageModels.json`의 `url`을 APIM 게이트웨이 URL로 변경하고, APIM 구독 키가 필요하면 모델 항목에 `requestHeaders` 추가
-- Copilot CLI: `azure` provider로 APIM 게이트웨이 루트 URL을 지정하고, APIM의 Azure OpenAI 호환 API가 `api-key` 헤더를 subscription key로 받도록 구성
+- VS Code: Change the `url` in `chatLanguageModels.json` to the APIM gateway URL, and add `requestHeaders` to the model entry if an APIM subscription key is required
+- Copilot CLI: Point the `azure` provider at the APIM gateway root URL, and configure APIM's Azure OpenAI-compatible API to accept the `api-key` header as the subscription key
 
-### C-1. VS Code Copilot Chat에서 APIM API 추가
+### C-1. Adding an APIM API in VS Code Copilot Chat
 
-VS Code에서 APIM subscription key를 요구하는 API를 붙일 때는 기존 Azure provider 아래에 APIM 모델을 추가하고, 모델 객체 안에 `requestHeaders`를 넣으면 됩니다.
+When attaching an API in VS Code that requires an APIM subscription key, add the APIM model under the existing Azure provider and include `requestHeaders` inside the model object.
 
-**Foundry 직접 연결 + APIM 경유 모델을 함께 등록하는 예시**:
+**Example registering both a direct Foundry connection and an APIM-routed model**:
 
 ```jsonc
 [
@@ -188,13 +188,13 @@ VS Code에서 APIM subscription key를 요구하는 API를 붙일 때는 기존 
 ]
 ```
 
-> 검증 결과: `requestHeaders` 없이 호출하면 APIM에서 `missing subscription key` 오류가 발생합니다. `Ocp-Apim-Subscription-Key`를 추가하면 APIM 인증은 통과합니다. 이후 `content_filter` 오류가 발생하는 경우는 APIM 연결 문제가 아니라 백엔드 Azure OpenAI/Foundry 콘텐츠 필터가 프롬프트를 차단한 것입니다.
+> Verification result: Calling without `requestHeaders` produces a `missing subscription key` error from APIM. Adding `Ocp-Apim-Subscription-Key` passes APIM authentication. If a `content_filter` error occurs afterward, it's not an APIM connection issue but the backend Azure OpenAI/Foundry content filter blocking the prompt.
 
-### C-2. Copilot CLI에서 APIM API 호출
+### C-2. Calling an APIM API from the Copilot CLI
 
-Copilot CLI는 APIM의 `/models/chat/completions` 경로를 `openai` provider로 호출하는 방식보다, APIM의 Azure OpenAI 호환 API(`/openai/deployments/{deployment-id}/chat/completions`)를 `azure` provider로 호출하는 방식이 맞습니다.
+For the Copilot CLI, rather than calling APIM's `/models/chat/completions` path with the `openai` provider, the correct approach is to call APIM's Azure OpenAI-compatible API (`/openai/deployments/{deployment-id}/chat/completions`) with the `azure` provider.
 
-APIM API의 subscription key header 이름이 `api-key`인지 먼저 확인합니다.
+First check whether the APIM API's subscription key header name is `api-key`.
 
 ```bash
 az apim api show \
@@ -205,7 +205,7 @@ az apim api show \
   -o json
 ```
 
-결과의 `header` 값이 `api-key`가 아니면 다음처럼 변경합니다.
+If the result's `header` value is not `api-key`, change it as follows.
 
 ```bash
 az apim api update \
@@ -216,7 +216,7 @@ az apim api update \
   --subscription-key-query-param-name subscription-key
 ```
 
-Copilot CLI를 APIM 경유로 실행하는 예시입니다.
+Here's an example of running the Copilot CLI through APIM.
 
 ```bash
 export COPILOT_PROVIDER_TYPE="azure"
@@ -228,24 +228,24 @@ export COPILOT_MODEL="gpt-4o"
 copilot -p "Reply with exactly: APIM_CLI_OK"
 ```
 
-이 구성에서 Copilot CLI는 다음 APIM 경로를 호출합니다.
+With this configuration, the Copilot CLI calls the following APIM path.
 
 ```text
 https://apim-ai-gw-eastus-demo.azure-api.net/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21
 ```
 
-> 검증 결과: 위 구성으로 `APIM_CLI_OK` 응답을 확인했습니다. `openai` provider + `/models` API 조합은 모델 검증/호출 경로가 APIM 라우트와 맞지 않아 실패할 수 있습니다.
+> Verification result: The configuration above confirmed an `APIM_CLI_OK` response. The `openai` provider + `/models` API combination may fail because the model validation/call path doesn't match the APIM route.
 
-## 다음 단계
+## Next steps
 
-직접 API 호출과 Copilot 호출이 모두 검증되면, 이 호출들을 한 진입점으로 모아 통제하는 **[04. 전체 API 호출 거버닝 아키텍처](04-api-governance-architecture.md)** 로 진행하세요.
+Once both direct API calls and Copilot calls are verified, proceed to **[04. End-to-End API Call Governance Architecture](04-api-governance-architecture.md)**, which consolidates these calls into a single entry point for control.
 
-## 참고 문서
+## Reference docs
 
 - [VS Code – Language models / BYOK](https://code.visualstudio.com/docs/copilot/customization/language-models)
 - [GitHub Copilot in VS Code](https://code.visualstudio.com/docs/copilot/overview)
-- [GitHub Copilot CLI에서 사용자 고유의 LLM 모델 사용](https://docs.github.com/ko/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models)
+- [Use BYOK models in GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models)
 - [About GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-copilot-cli)
 - [Azure OpenAI in Microsoft Foundry Models v1 API](https://learn.microsoft.com/en-us/azure/ai-foundry/model-inference/how-to/use-chat-completions)
-- [Azure OpenAI Entra ID / managed identity 인증](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/managed-identity)
-- [APIM으로 LLM API 인증·권한 부여](https://learn.microsoft.com/en-us/azure/api-management/api-management-authenticate-authorize-ai-apis)
+- [Azure OpenAI Entra ID / managed identity authentication](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/managed-identity)
+- [Authenticate and authorize access to LLM APIs with APIM](https://learn.microsoft.com/en-us/azure/api-management/api-management-authenticate-authorize-ai-apis)
