@@ -7,7 +7,7 @@
 - Foundry의 리소스, 프로젝트, 배포 개념 이해
 - 포털 또는 Azure CLI로 Foundry 리소스와 모델 배포 구성
 - API Key와 Microsoft Entra ID 방식으로 모델 호출 검증
-- VS Code Copilot Chat과 GitHub Copilot CLI에서 Foundry 모델 연결
+- VS Code Copilot Chat, GitHub Copilot CLI, Claude Code에서 Foundry 모델 연결
 - APIM AI 게이트웨이로 앱과 개발자 도구 호출을 함께 거버닝
 
 ## 가이드 구성
@@ -50,6 +50,17 @@
 - API Key, bearer token, APIM 경유 호출 차이
 - 실제 검증된 Kimi 및 APIM 호출 패턴
 
+### 03b. Claude Code에서 Foundry 모델 호출 (실험/참고용)
+
+[문서 열기](docs/03b-claude-code-foundry-integration.md)
+
+> 서드파티 프록시(LiteLLM)에 의존하는 비공식 구성입니다. 공식/비공식 경계와 프로덕션 체크리스트는 문서 내에 정리되어 있습니다.
+
+- LiteLLM 프록시 경유 연결 (Anthropic ↔ OpenAI 포맷 변환)
+- Entra ID 자동 갱신 인증 (API Key 불필요)
+- `/model`로 Kimi·Grok·GLM 등 여러 Foundry 모델 전환
+- APIM 게이트웨이를 거친 운영 전환
+
 ### 04. 전체 API 호출 거버닝 아키텍처
 
 [문서 열기](docs/04-api-governance-architecture.md)
@@ -64,7 +75,7 @@
 1. 개념이 낯설다면 [00. 개념 소개](docs/00-concepts.md)부터 읽습니다.
 2. 화면으로 따라 하려면 [포털 셋업](docs/01-setup-portal.md), 자동화를 검증하려면 [CLI 셋업](docs/01-setup-cli.md)을 진행합니다.
 3. 모델 배포 후 [API 호출](docs/02-api-calls.md)에서 직접 호출을 확인합니다.
-4. 개발자 도구 연동이 필요하면 [Copilot 연동](docs/03-copilot-foundry-integration.md)을 진행합니다.
+4. 개발자 도구 연동이 필요하면 [Copilot 연동](docs/03-copilot-foundry-integration.md) 또는 [Claude Code 연동](docs/03b-claude-code-foundry-integration.md)을 진행합니다.
 5. 운영 전환 시 [APIM 거버넌스 아키텍처](docs/04-api-governance-architecture.md)로 호출 경로를 통합합니다.
 
 ## 작성 기준
