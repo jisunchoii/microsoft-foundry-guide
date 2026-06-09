@@ -233,7 +233,7 @@ Codex는 에이전트 모드에서 항상 **툴 목록을 함께 전송**합니�
 - **sub-agent까지 쓰려면 Azure OpenAI Responses 계열(gpt-4.1, gpt-5-mini)** 을 사용하세요. `namespace` 툴을 네이티브로 수용합니다. 둘 중에서는 추론 모델인 **gpt-5-mini가 sub-agent 호출을 가장 안정적으로** 생성합니다.
 - **비-OpenAI 모델(Kimi·grok-4.3·DeepSeek-V3.1·MiniMax-M2.5·GLM-5.1)은 기본 경로로는 sub-agent를 쓸 수 없습니다.** 이들이 공유하는 Azure AI 모델 추론(Chat Completions) 엔드포인트가 `type: "function"` 외의 툴 타입을 거부하기 때문이며, 특정 모델만의 문제가 아닙니다. `[features] multi_agent = false`로 sub-agent만 끄면 일반 에이전트로는 정상 동작합니다(Part B). 우회 구성은 아래 [1-3](#1-3-심화-비-openai-모델에서-codex-sub-agent를-동작시키는-우회-구성-poc)을 참고하세요.
 
-> 참고: 위 매트릭스는 "Codex가 보내는 툴을 백엔드가 받아들이는지"에 대한 것입니다. 받아들여진 뒤의 **tool calling 품질**(얼마나 정확히 툴을 호출하는지)은 모델마다 다릅니다. 예를 들어 gpt-4.1은 `namespace` 툴을 수용하지만 sub-agent 호출 인자를 일관되게 생성하지 못하는 경우가 있으므로, 복잡한 워크플로는 대상 모델로 검증하세요.
+> 참고: 위 매트릭스는 "Codex가 보내는 툴을 백엔드가 받아들이는지"에 대한 것입니다. 받아들여진 뒤의 **tool calling 품질**(얼마나 정확히 툴을 호출하는지)은 모델마다 다릅니다. 예를 들어 gpt-4.1은 `namespace` 툴을 수용하지만 sub-agent 호출 인자를 일관되게 생성하지 못하는 경우가 있고, 우회 프록시(1-3)로 sub-agent를 동작시킨 비-OpenAI 모델 중에서도 **grok-4.3·MiniMax-M2.5는 실제 sub-agent 작업 검증에서 실패**했습니다(아래 [1-3](#1-3-심화-비-openai-모델에서-codex-sub-agent를-동작시키는-우회-구성-poc) 참고). 따라서 복잡한 워크플로는 대상 모델로 직접 검증하세요.
 
 ## 1-3. (심화) 비-OpenAI 모델에서 Codex sub-agent를 동작시키는 우회 구성 (PoC)
 
@@ -301,14 +301,19 @@ env_key = "DUMMY_KEY"      # 프록시→LiteLLM 내부 인증용 임의 값
 
 ```bash
 export DUMMY_KEY="sk-local-anything"
-codex --profile roundtrip exec "Spawn a sub-agent that replies PONG, then tell me what it returned."
+codex --profile roundtrip exec "두 개의 sub-agent를 병렬로 띄워 각각 첫 번째·두 번째 문서를 3줄로 요약한 뒤, 두 요약을 '## 문서 A 요약 / ## 문서 B 요약' 형태로 합쳐서 출력해줘."
 ```
 
 `collab: SpawnAgent` → `collab: Wait` 흐름이 표시되면 sub-agent가 디스패치된 것입니다.
 
 ### 적용 범위와 한계
 
-이 구성으로 Kimi·grok-4.3·DeepSeek-V3.1·GLM-5.1에서 Codex sub-agent가 동작했습니다. MiniMax-M2.5는 sub-agent 디스패치까지는 진행되지만, 모델 서빙 측 채팅 템플릿이 툴 메시지 순서를 더 엄격하게 검증해 거부합니다.
+이 구성으로 **두 개의 sub-agent를 병렬로 띄워 각각 문서를 요약한 뒤 하나로 합치는 실제 작업**을 검증했습니다. **Kimi·DeepSeek-V3.1·GLM-5.1**은 sub-agent를 정상적으로 생성·병합해 작업을 끝까지 완료했습니다. 반면 **grok-4.3·MiniMax-M2.5**는 sub-agent 디스패치(`collab: SpawnAgent`)까지는 진행되지만 작업을 완료하지 못했습니다.
+
+- **grok-4.3**: `wait_agent`의 타임아웃 인자를 정수가 아닌 실수(`300000.0`)로 생성해 Codex 라우터가 거부하는 재시도 루프에 빠졌습니다(더 단순한 단일 sub-agent 작업에서는 통과). 전송이 아니라 모델의 호출 인자 품질 문제입니다.
+- **MiniMax-M2.5**: 모델 서빙 측 채팅 템플릿이 툴 메시지 순서를 더 엄격하게 검증해 거부합니다.
+
+즉 실패 원인은 프록시(전송 계층)가 아니라 모델의 sub-agent 호출 품질·서빙 제약입니다.
 
 운영에는 권장하지 않습니다. Codex 내부 와이어 형식에 의존하므로 버전 업데이트에 깨질 수 있고, 단일 sub-agent 경로만 검증됐습니다. sub-agent가 필요한 운영 환경에서는 Azure OpenAI Responses 계열(gpt-5-mini 등)을 사용하고, 비-OpenAI 모델은 `multi_agent = false`로 일반 에이전트로 사용하세요.
 
