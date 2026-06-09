@@ -9,6 +9,7 @@ OpenAI Codex CLI에서 Foundry에 배포한 모델을 호출하고, 여러 모�
 - 추론(reasoning) 모델 `gpt-5-mini`로 sub-agent(병렬 하위 에이전트)까지 사용
 - LiteLLM 프록시를 경유해 Kimi·Grok·DeepSeek 등 비-OpenAI 모델 연결
 - 모델별 tool calling / sub-agent 지원 매트릭스
+- (심화) Claude Code vs Codex sub-agent 차이와 namespace 보존 우회 PoC
 - 프로파일과 `/model`로 여러 Foundry 모델 전환
 - APIM 게이트웨이를 경유한 운영 전환 방식
 
@@ -233,6 +234,28 @@ Codex는 에이전트 모드에서 항상 **툴 목록을 함께 전송**합니�
 - **비-OpenAI 모델(Kimi·grok-4.3·DeepSeek-V3.1·MiniMax-M2.5·GLM-5.1)은 sub-agent를 쓸 수 없습니다.** 이들이 공유하는 Azure AI 모델 추론(Chat Completions) 엔드포인트가 `type: "function"` 외의 툴 타입을 거부하기 때문이며, 특정 모델만의 문제가 아닙니다. `[features] multi_agent = false`로 sub-agent만 끄면 일반 에이전트로는 정상 동작합니다(Part B).
 
 > 참고: 위 매트릭스는 "Codex가 보내는 툴을 백엔드가 받아들이는지"에 대한 것입니다. 받아들여진 뒤의 **tool calling 품질**(얼마나 정확히 툴을 호출하는지)은 모델마다 다르므로, 복잡한 워크플로는 대상 모델로 실제 검증을 권장합니다.
+
+## 1-3. 추가 검증 — 왜 Claude Code는 sub-agent가 되고 Codex는 안 되나 (그리고 우회 PoC)
+
+같은 비-OpenAI 모델(Kimi 등)을 같은 LiteLLM으로 물려도, **Claude Code의 multi-agent는 정상 동작**하고 **Codex의 sub-agent는 거부**됩니다. 차이는 모델이 아니라 **클라이언트가 sub-agent 툴을 와이어에 싣는 방식**에 있습니다(실측).
+
+- **Claude Code (Anthropic Messages API)**: sub-agent 디스패치(`Agent`, `TaskCreate`, `TaskGet`, `TaskList`, `TaskOutput`, `TaskStop`, `TaskUpdate`)가 **타입 없는 평범한 툴**(name·description·input_schema)입니다. LiteLLM이 Anthropic→Chat Completions 변환 시 이를 `type:"function"`으로 바꾸고, Foundry가 수용합니다. `namespace` 같은 특수 타입이 와이어에 전혀 등장하지 않으므로 **Kimi에서도 multi-agent가 그대로 동작**합니다(2.1.x로 실측: 하위 에이전트가 `PONG` 반환).
+- **Codex (Responses API)**: sub-agent 툴을 `type:"namespace"`(`multi_agent_v1`)로 보냅니다. Foundry의 Chat Completions 엔드포인트는 `type:"function"`만 허용하므로 거부됩니다. 즉 **특수 케이스는 모델이 아니라 Codex**입니다.
+
+### namespace를 보존하는 양방향 프록시 우회 (PoC)
+
+`multi_agent = false`로 끄는 대신, **LiteLLM 앞단에 양방향 변환 프록시**를 두면 비-OpenAI 모델에서도 Codex sub-agent를 동작시킬 수 있습니다. 핵심은 **요청 측 변환만으로는 부족**하고, **응답 스트림에 `namespace` 필드를 되돌려 주입**해야 한다는 점입니다(이 한 가지가 빠져서 단순 rename 시도는 모두 클라이언트 라우터의 `unsupported call`로 실패했습니다).
+
+검증된 변환 3단계 + 정리(`Codex → 프록시 → LiteLLM → Kimi`):
+
+1. **요청(툴)**: 각 `type:"namespace"` 툴을 `type:"function"`으로 평탄화하되, 네임스페이스를 이름 접미어로 인코딩합니다. 예: `spawn_agent` → `spawn_agent__nsq__multi_agent_v1`. 백엔드는 `function` 툴만 보게 되어 거부되지 않습니다.
+2. **요청(히스토리)**: Codex가 되돌려 보내는 `function_call` 입력 아이템도 같은 규칙으로 이름을 재인코딩합니다(인코딩된 툴 목록과 이름이 일치하도록).
+3. **응답(SSE 중간)**: 스트림의 `function_call` 출력 아이템 중 접미어가 붙은 것을 다시 `name` + `namespace`로 분리해 **`namespace` 필드를 재주입**합니다. 이것이 gpt-4.1의 네이티브 와이어 형태(`{"type":"function_call","name":"spawn_agent","namespace":"multi_agent_v1",...}`)를 재현해 Codex 라우터가 디스패치합니다.
+4. **정리**: 빈 텍스트 콘텐츠 파트(`{"type":"...text","text":""}`)를 입력에서 제거합니다(Chat Completions 백엔드가 빈 콘텐츠에 422를 냄 — sub-agent 턴 직후 Codex가 삽입).
+
+실측 결과(kimi-k2, `features.multi_agent=true`): `collab: SpawnAgent` → `collab: Wait` → 하위 에이전트가 `PONG` 반환, 정상 종료. 즉 **namespace는 LiteLLM을 통해 보존 가능하지만, 응답 측 재주입이 필수**입니다.
+
+> ⚠️ 이건 어디까지나 **개념 증명(PoC)** 입니다. 운영에는 권장하지 않습니다 — 단일 sub-agent 경로만 검증됐고, Codex 내부 와이어 형태에 의존하므로 버전 업데이트에 깨질 수 있습니다. 운영에서는 sub-agent가 필요하면 Azure OpenAI Responses 계열(gpt-4.1, gpt-5-mini)을, 비-OpenAI 모델은 `multi_agent = false`를 사용하세요.
 
 ## 2. 모델 전환
 
