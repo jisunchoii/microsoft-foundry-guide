@@ -209,14 +209,14 @@ export LITELLM_MASTER_KEY="sk-local-anything"
 codex --profile litellm exec "Reply with exactly: CODEX_LITELLM_OK"
 ```
 
-> **검증 결과**: 위 구성으로 Kimi 모델에서 Codex CLI 호출이 `CODEX_LITELLM_OK`를 반환하는 것을 확인했습니다(LiteLLM의 Responses→Chat 변환·라우팅 정상). 단, `[features] multi_agent = false`가 **없으면** Codex가 sub-agent 툴을 `type: "namespace"`로 함께 전송하고, Kimi(MoonshotAI) 같은 엄격한 백엔드가 이를 거부해 다음 오류가 납니다.
+> **검증 결과**: 위 구성으로 Kimi 모델에서 Codex CLI 호출이 `CODEX_LITELLM_OK`를 반환하는 것을 확인했습니다(LiteLLM의 Responses→Chat 변환·라우팅 정상). 단, `[features] multi_agent = false`가 **없으면** Codex가 sub-agent 툴을 `type: "namespace"`로 함께 전송하고, 비-OpenAI 백엔드가 이를 거부해 다음 오류가 납니다.
 >
 > ```text
 > 422 Unprocessable Entity: tools[7].type — Input should be 'function', input: 'namespace'
 > ```
 >
 > **원인과 해결**:
-> - 원인: Codex의 `multi_agent`(sub-agent 생성·관리) 툴은 OpenAI Responses 규격의 `function`이 아닌 `namespace` 타입으로 전송됩니다. Azure OpenAI 백엔드는 이를 수용하지만, 일부 비-OpenAI 백엔드(Kimi 등)는 엄격히 검증해 거부합니다.
+> - 원인: Codex의 `multi_agent`(sub-agent 생성·관리) 툴은 OpenAI Responses 규격의 `function`이 아닌 `namespace` 타입으로 전송됩니다. Azure OpenAI 백엔드는 이를 수용하지만, **비-OpenAI 백엔드(Kimi·grok·DeepSeek 등)는 모두** 공유하는 Azure AI 모델 추론(Chat) 엔드포인트의 스키마가 `function` 타입만 허용하므로 이를 거부합니다(Kimi·DeepSeek는 422, grok은 400). 즉 Kimi 고유 문제가 아니라 비-OpenAI 모델 전반의 특성입니다.
 > - 해결: 위처럼 프로파일에 `[features] multi_agent = false`를 넣으면 해당 툴이 빠져 정상 동작합니다. 일회성으로는 `codex --profile litellm exec -c 'features.multi_agent=false' ...`로도 가능합니다.
 >
 > **참고 한계**:
@@ -233,12 +233,14 @@ Codex는 에이전트 모드에서 항상 **툴 목록을 함께 전송**합니�
 | **gpt-4.1** | Azure OpenAI / 직결(Part A) | ✅ | ✅ | 에이전트 + sub-agent |
 | **gpt-5-mini** | Azure OpenAI 추론 / 직결(A-3) | ✅ | ✅ | 에이전트 + sub-agent |
 | **Kimi-K2** | MoonshotAI / LiteLLM(Part B) | ✅ | ❌ (422 거부) | 에이전트만 (`multi_agent=false` 필요) |
+| **grok-4.3** | xAI / 모델 추론(Chat) | ✅ | ❌ (400 거부) | 에이전트만 (`multi_agent=false` 필요) |
+| **DeepSeek-V3.1** | DeepSeek / 모델 추론(Chat) | ✅ | ❌ (422 거부) | 에이전트만 (`multi_agent=false` 필요) |
 | **gpt-oss-120b** | OpenAI-OSS(오픈웨이트) / 직결 | ❌ (툴 배열 자체 거부) | ❌ | 텍스트 전용 (에이전트 불가) |
 
 핵심 결론:
 
 - **sub-agent까지 쓰려면 Azure OpenAI Responses 계열(gpt-4.1, gpt-5-mini 등)** 을 사용하세요. `namespace` 툴을 네이티브로 수용합니다.
-- **Kimi 등 비-OpenAI 모델**은 `function` 툴 호출은 되지만 `namespace`를 거부하므로 `[features] multi_agent = false`로 sub-agent만 꺼서 일반 에이전트로 사용합니다(Part B).
+- **`namespace`(sub-agent) 거부는 Kimi 고유 문제가 아닙니다.** Kimi·grok-4.3·DeepSeek-V3.1을 동일하게 실측한 결과 **비-OpenAI 모델은 모두** `function` 툴은 받아들이지만 `namespace` 툴은 거부했습니다(DeepSeek·Kimi는 422 `Input should be 'function'`, grok은 400 `missing field function`). 이는 개별 모델이 아니라 **모든 비-OpenAI 모델이 공유하는 Azure AI 모델 추론(Chat Completions) 엔드포인트가 `type: "function"` 외의 툴 타입을 스키마에서 거부**하기 때문입니다. 따라서 이런 모델은 **종류와 무관하게** `[features] multi_agent = false`로 sub-agent만 꺼서 일반 에이전트로 사용합니다(Part B).
 - **`gpt-oss-120b` 같은 오픈웨이트 모델**은 Foundry Responses에서 **`tools` 배열이 포함된 요청 자체를 거부**(`HTTP 400 ApiSamplingErrorUnprocessableInput`)합니다. 단순한 함수 툴 하나만 넣어도 실패하므로 **Codex 에이전트 모델로는 쓸 수 없고**(툴 없는 순수 텍스트 호출만 가능), sub-agent는 당연히 불가합니다.
 
 > 참고: 위 매트릭스는 "Codex가 보내는 툴을 백엔드가 받아들이는지"에 대한 것입니다. 받아들여진 뒤의 **tool calling 품질**(얼마나 정확히 툴을 호출하는지)은 모델마다 다르므로, 복잡한 워크플로는 대상 모델로 실제 검증을 권장합니다.

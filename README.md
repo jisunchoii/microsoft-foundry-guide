@@ -70,7 +70,7 @@
 - Azure OpenAI 계열 직접 연결 (Entra ID 자동 갱신 / API Key)
 - 추론 모델 `gpt-5-mini`로 sub-agent(병렬 하위 에이전트)까지 사용
 - 비-OpenAI 모델은 LiteLLM 프록시 경유
-- 모델별 tool calling / sub-agent 지원 매트릭스 (gpt-4.1·gpt-5-mini vs Kimi·gpt-oss)
+- 모델별 tool calling / sub-agent 지원 매트릭스 (gpt-4.1·gpt-5-mini vs Kimi·grok·DeepSeek — sub-agent 거부는 비-OpenAI 모델 전반의 특성)
 - 프로파일과 `/model`로 여러 Foundry 모델 전환
 - APIM 게이트웨이를 거친 운영 전환
 
