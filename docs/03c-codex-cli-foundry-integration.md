@@ -6,7 +6,9 @@ OpenAI Codex CLI에서 Foundry에 배포한 모델을 호출하고, 여러 모�
 
 - Codex CLI의 custom model provider 구성 방식과 `wire_api` 제약
 - Azure OpenAI 계열 모델 직접 연결 (Entra ID 자동 갱신 / API key)
+- 추론(reasoning) 모델 `gpt-5-mini`로 sub-agent(병렬 하위 에이전트)까지 사용
 - LiteLLM 프록시를 경유해 Kimi·Grok·GLM 등 비-OpenAI 모델 연결
+- 모델별 tool calling / sub-agent 지원 매트릭스
 - 프로파일과 `/model`로 여러 Foundry 모델 전환
 - APIM 게이트웨이를 경유한 운영 전환 방식
 
@@ -18,7 +20,7 @@ OpenAI Codex CLI에서 Foundry에 배포한 모델을 호출하고, 여러 모�
 - **모델 요건**: **툴 호출(tool calling) + 스트리밍** 지원 필수. 컨텍스트 윈도우는 **128k 이상 권장**입니다.
 - **인증 방식**: Entra ID(키리스)를 권장합니다. Codex는 `[model_providers.<id>.auth]`로 외부 명령에서 bearer token을 받아 자동 갱신할 수 있어, `az account get-access-token`을 토큰 헬퍼로 지정하면 API key가 필요 없습니다.
 
-> 에이전트 모드(파일 편집/툴 실행)로 쓰려면 모델이 반드시 **tool calling**을 지원해야 합니다 (예: gpt-4.1, Kimi-K2, Grok).
+> 에이전트 모드(파일 편집/툴 실행)로 쓰려면 모델이 반드시 **tool calling**을 지원해야 합니다 (예: gpt-4.1, gpt-5-mini, Kimi-K2). 더 나아가 **sub-agent(병렬 하위 에이전트)**까지 쓰려면 Azure OpenAI Responses 계열(gpt-4.1, gpt-5-mini)이 필요합니다. 모델별 지원 범위는 아래 [1-2. 모델별 tool calling / sub-agent 지원 매트릭스](#1-2-모델별-tool-calling--sub-agent-지원-매트릭스)를 참고하세요.
 
 ## 1. 핵심 제약 — Codex는 Responses API(`wire_api = "responses"`)만 사용
 
@@ -106,6 +108,38 @@ codex exec "Reply with exactly: CODEX_AZKEY_OK"
 
 > 보안 권고: API key는 전체 접근 권한을 가지므로 운영에서는 Entra ID(A-1)를 권장합니다. 또한 Foundry 리소스에 **로컬 인증 비활성화**(`disableLocalAuth=true`, 일부 조직은 Azure Policy로 강제) 정책이 적용되면 키 발급 자체가 막히고 키 호출이 401로 거부됩니다. 이때는 A-1의 Entra ID 방식을 사용하세요.
 
+### A-3. 추론 모델 + sub-agent — `gpt-5-mini`
+
+Azure OpenAI **추론(reasoning) 모델**인 `gpt-5-mini`는 Responses API를 네이티브로 노출하고, Codex가 보내는 **전체 툴 세트(`function` + sub-agent용 `namespace` 툴 포함)를 모두 수용**합니다. 즉 파일 편집·셸 실행뿐 아니라 **sub-agent(병렬 하위 에이전트) 생성·관리까지** Foundry 위에서 동작합니다.
+
+같은 Azure OpenAI 계열이라 **A-1과 동일한 `azure_foundry` provider(Responses + Entra ID 자동 갱신)를 그대로 재사용**하고 모델 이름만 바꾸면 됩니다.
+
+배포 (예: GlobalStandard):
+
+```bash
+az cognitiveservices account deployment create \
+  --name <리소스이름> --resource-group <RG> \
+  --deployment-name gpt-5-mini \
+  --model-name gpt-5-mini --model-version 2025-08-07 \
+  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 50
+```
+
+실행 — provider는 그대로 두고 모델만 전환합니다.
+
+```bash
+codex exec --model gpt-5-mini "Reply with exactly: CODEX_GPT5MINI_OK"
+```
+
+추론 모델이므로 추론 강도/요약 옵션을 조절할 수 있습니다.
+
+```toml
+model = "gpt-5-mini"
+model_provider = "azure_foundry"        # A-1과 동일 provider 재사용
+model_reasoning_effort = "medium"        # minimal | low | medium | high
+```
+
+> **검증 결과**: `gpt-5-mini` 배포에서 Codex의 **전체 Codex 툴 세트(sub-agent `multi_agent_v1` 포함)** 요청이 `status: completed`로 수락되는 것을 직접 확인했고, Codex CLI에서 **`multi_agent`를 켠 기본 상태 그대로** 호출해 `CODEX_GPT5MINI_OK`를 반환했습니다. 즉 Kimi와 달리 `[features] multi_agent = false`가 **필요 없습니다**.
+
 ## Part B. 비-OpenAI 모델 — LiteLLM 프록시 경유
 
 Kimi·Grok·GLM 등은 Foundry에서 Chat Completions만 노출하므로, Codex의 Responses 요청을 변환하는 [LiteLLM](https://docs.litellm.ai/) 프록시를 중간에 둡니다. LiteLLM은 Responses ↔ Chat Completions 변환과 Entra ID 토큰 자동 갱신을 제공합니다.
@@ -190,6 +224,25 @@ codex --profile litellm exec "Reply with exactly: CODEX_LITELLM_OK"
 > - 모델 자체의 tool calling 품질은 모델마다 다르므로, 복잡한 에이전트 워크플로는 대상 비-OpenAI 모델로 실제 검증을 권장합니다.
 > - 배포 용량이 낮으면(`--sku-capacity 1`) Codex의 큰 컨텍스트 요청이 `429 RateLimitReached`를 유발합니다. 테스트 시 용량을 충분히(예: 50) 올리세요.
 
+## 1-2. 모델별 tool calling / sub-agent 지원 매트릭스
+
+Codex는 에이전트 모드에서 항상 **툴 목록을 함께 전송**합니다. 그중 sub-agent(병렬 하위 에이전트) 툴은 OpenAI Responses 규격의 `function`이 아닌 **`type: "namespace"`** 로 전송됩니다. 모델·백엔드별 수용 범위가 달라 다음과 같이 정리됩니다(실측).
+
+| 모델 | 형식 / 연결 | `function` 툴 | sub-agent(`namespace`) | Codex 사용 |
+|------|------------|:------------:|:----------------------:|-----------|
+| **gpt-4.1** | Azure OpenAI / 직결(Part A) | ✅ | ✅ | 에이전트 + sub-agent |
+| **gpt-5-mini** | Azure OpenAI 추론 / 직결(A-3) | ✅ | ✅ | 에이전트 + sub-agent |
+| **Kimi-K2** | MoonshotAI / LiteLLM(Part B) | ✅ | ❌ (422 거부) | 에이전트만 (`multi_agent=false` 필요) |
+| **gpt-oss-120b** | OpenAI-OSS(오픈웨이트) / 직결 | ❌ (툴 배열 자체 거부) | ❌ | 텍스트 전용 (에이전트 불가) |
+
+핵심 결론:
+
+- **sub-agent까지 쓰려면 Azure OpenAI Responses 계열(gpt-4.1, gpt-5-mini 등)** 을 사용하세요. `namespace` 툴을 네이티브로 수용합니다.
+- **Kimi 등 비-OpenAI 모델**은 `function` 툴 호출은 되지만 `namespace`를 거부하므로 `[features] multi_agent = false`로 sub-agent만 꺼서 일반 에이전트로 사용합니다(Part B).
+- **`gpt-oss-120b` 같은 오픈웨이트 모델**은 Foundry Responses에서 **`tools` 배열이 포함된 요청 자체를 거부**(`HTTP 400 ApiSamplingErrorUnprocessableInput`)합니다. 단순한 함수 툴 하나만 넣어도 실패하므로 **Codex 에이전트 모델로는 쓸 수 없고**(툴 없는 순수 텍스트 호출만 가능), sub-agent는 당연히 불가합니다.
+
+> 참고: 위 매트릭스는 "Codex가 보내는 툴을 백엔드가 받아들이는지"에 대한 것입니다. 받아들여진 뒤의 **tool calling 품질**(얼마나 정확히 툴을 호출하는지)은 모델마다 다르므로, 복잡한 워크플로는 대상 모델로 실제 검증을 권장합니다.
+
 ## 2. 모델 전환
 
 Codex는 두 가지 전환 축이 있습니다.
@@ -210,11 +263,12 @@ Codex는 두 가지 전환 축이 있습니다.
 
 > 프로파일 파일은 기본 `config.toml` 위에 겹치는 레이어이므로, 달라지는 값만 적으면 됩니다. provider 정의를 담은 키(`model_provider`, `model_providers`)는 사용자 레벨에만 둘 수 있습니다.
 
-> **검증 결과**: `codex exec`(기본 프로파일, Azure 직결 gpt-4.1)는 `CODEX_AZURE_OK`를, `--profile litellm`(Kimi)은 `CODEX_LITELLM_OK`를 반환해 **두 모델 모두 Codex CLI에서 정상 호출·전환**됨을 확인했습니다. 비-OpenAI 모델은 프로파일에 `[features] multi_agent = false`가 필요합니다(위 B-2 참고).
+> **검증 결과**: `codex exec`(기본 프로파일, Azure 직결 gpt-4.1)는 `CODEX_AZURE_OK`를, `--model gpt-5-mini`(추론 모델, sub-agent 포함)는 `CODEX_GPT5MINI_OK`를, `--profile litellm`(Kimi)은 `CODEX_LITELLM_OK`를 반환해 **세 모델 모두 Codex CLI에서 정상 호출·전환**됨을 확인했습니다. Azure OpenAI 계열(gpt-4.1·gpt-5-mini)은 sub-agent까지 그대로 동작하고, 비-OpenAI 모델(Kimi)은 프로파일에 `[features] multi_agent = false`가 필요합니다(위 B-2·1-2 매트릭스 참고).
 
 ## 3. 요건
 
-- 커스텀 모델은 **tool calling(함수 호출) + 스트리밍**을 지원해야 합니다.
+- 커스텀 모델은 **tool calling(함수 호출) + 스트리밍**을 지원해야 합니다. 일부 오픈웨이트 모델(예: `gpt-oss-120b`)은 Foundry Responses에서 툴 배열 자체를 거부하므로 에이전트 모델로 쓸 수 없습니다(1-2 매트릭스 참고).
+- sub-agent(병렬 하위 에이전트)까지 쓰려면 `namespace` 툴을 수용하는 **Azure OpenAI Responses 계열**(gpt-4.1, gpt-5-mini)이 필요합니다.
 - 컨텍스트 윈도우 **128k 이상 권장**.
 - Codex는 Responses API 와이어 포맷만 사용합니다. Chat Completions만 노출하는 모델은 Part B처럼 변환 프록시가 필요합니다.
 - `model_reasoning_effort`·`model_verbosity` 등 일부 옵션은 Responses API 지원 모델에서만 적용됩니다.

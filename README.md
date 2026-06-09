@@ -68,7 +68,9 @@
 > Codex CLI는 Responses API 와이어 포맷만 사용하므로, Azure OpenAI 계열은 직접 연결하고 비-OpenAI 모델은 LiteLLM 프록시를 경유하는 혼합 구성을 다룹니다.
 
 - Azure OpenAI 계열 직접 연결 (Entra ID 자동 갱신 / API Key)
+- 추론 모델 `gpt-5-mini`로 sub-agent(병렬 하위 에이전트)까지 사용
 - 비-OpenAI 모델은 LiteLLM 프록시 경유
+- 모델별 tool calling / sub-agent 지원 매트릭스 (gpt-4.1·gpt-5-mini vs Kimi·gpt-oss)
 - 프로파일과 `/model`로 여러 Foundry 모델 전환
 - APIM 게이트웨이를 거친 운영 전환
 
