@@ -155,6 +155,12 @@ provider 전환은 **프로파일 파일**로 깔끔하게 분리하는 것이 �
 model = "kimi-k2"
 model_provider = "litellm"
 
+# 필수: Codex의 sub-agent(multi_agent) 툴을 끕니다.
+# 이 툴은 type="namespace"로 전송되는데, Kimi 등 엄격한 비-OpenAI 백엔드는
+# function 이외의 tool type을 거부(422)하므로 반드시 비활성화해야 합니다.
+[features]
+multi_agent = false
+
 [model_providers.litellm]
 name = "LiteLLM (Foundry non-OpenAI)"
 base_url = "http://127.0.0.1:4000"
@@ -169,17 +175,20 @@ export LITELLM_MASTER_KEY="sk-local-anything"
 codex --profile litellm exec "Reply with exactly: CODEX_LITELLM_OK"
 ```
 
-> **검증 결과 / 한계**: 위 구성에서 LiteLLM 프록시는 정상 동작했고, 백엔드 직접 호출(`POST /v1/chat/completions`, model `kimi-k2`)은 `LITELLM_BACKEND_OK`를 반환했습니다. 다만 **Codex의 에이전트 모드**에서는 Codex가 기본 툴 세트에 `type: "namespace"`(function이 아닌) 툴을 포함해 전송하는데, Kimi(MoonshotAI) 같은 일부 비-OpenAI 백엔드가 이를 거부합니다.
+> **검증 결과**: 위 구성으로 Kimi 모델에서 Codex CLI 호출이 `CODEX_LITELLM_OK`를 반환하는 것을 확인했습니다(LiteLLM의 Responses→Chat 변환·라우팅 정상). 단, `[features] multi_agent = false`가 **없으면** Codex가 sub-agent 툴을 `type: "namespace"`로 함께 전송하고, Kimi(MoonshotAI) 같은 엄격한 백엔드가 이를 거부해 다음 오류가 납니다.
 >
 > ```text
 > 422 Unprocessable Entity: tools[7].type — Input should be 'function', input: 'namespace'
 > ```
 >
-> 즉 **LiteLLM의 Responses→Chat 변환과 모델 라우팅은 정상**(요청이 Kimi까지 도달)이며, 모델이 Codex의 비-function 툴 스키마를 얼마나 수용하느냐가 관건입니다. 따라서:
-> - **풀 에이전트(파일 편집/툴 실행) 용도**: tool calling 스키마를 폭넓게 수용하는 모델(예: Azure OpenAI gpt-4.1 — **Part A**)을 권장합니다.
-> - **비-OpenAI 모델(Kimi·Grok·GLM)**: 단순 추론·질의 용도로는 LiteLLM 경유가 동작하지만, 엄격한 백엔드에서는 에이전트 툴 호출이 거부될 수 있어 **실험/참고용**으로 분류합니다. 운영 도입 전 대상 모델로 실제 에이전트 호출을 검증하세요.
+> **원인과 해결**:
+> - 원인: Codex의 `multi_agent`(sub-agent 생성·관리) 툴은 OpenAI Responses 규격의 `function`이 아닌 `namespace` 타입으로 전송됩니다. Azure OpenAI 백엔드는 이를 수용하지만, 일부 비-OpenAI 백엔드(Kimi 등)는 엄격히 검증해 거부합니다.
+> - 해결: 위처럼 프로파일에 `[features] multi_agent = false`를 넣으면 해당 툴이 빠져 정상 동작합니다. 일회성으로는 `codex --profile litellm exec -c 'features.multi_agent=false' ...`로도 가능합니다.
 >
-> 또한 배포 용량이 낮으면(`--sku-capacity 1`) Codex의 큰 컨텍스트 요청이 `429 RateLimitReached`를 유발합니다. 테스트 시 용량을 충분히(예: 50) 올리세요.
+> **참고 한계**:
+> - 위 설정은 sub-agent(병렬 하위 에이전트) 기능만 끄는 것으로, 파일 편집·셸 실행 등 일반 에이전트 기능에는 영향이 없습니다.
+> - 모델 자체의 tool calling 품질은 모델마다 다르므로, 복잡한 에이전트 워크플로는 대상 비-OpenAI 모델로 실제 검증을 권장합니다.
+> - 배포 용량이 낮으면(`--sku-capacity 1`) Codex의 큰 컨텍스트 요청이 `429 RateLimitReached`를 유발합니다. 테스트 시 용량을 충분히(예: 50) 올리세요.
 
 ## 2. 모델 전환
 
@@ -201,7 +210,7 @@ Codex는 두 가지 전환 축이 있습니다.
 
 > 프로파일 파일은 기본 `config.toml` 위에 겹치는 레이어이므로, 달라지는 값만 적으면 됩니다. provider 정의를 담은 키(`model_provider`, `model_providers`)는 사용자 레벨에만 둘 수 있습니다.
 
-> **검증 결과**: `codex exec`(기본 프로파일, Azure 직결 gpt-4.1)는 `CODEX_AZURE_OK`를, `--profile litellm`은 Kimi 백엔드까지 요청이 도달함을 확인했습니다. 즉 **프로파일 기반 provider/모델 전환 메커니즘 자체는 정상 동작**하며, 비-OpenAI 모델의 에이전트 호출 가능 여부는 위 Part B의 한계 노트를 따릅니다.
+> **검증 결과**: `codex exec`(기본 프로파일, Azure 직결 gpt-4.1)는 `CODEX_AZURE_OK`를, `--profile litellm`(Kimi)은 `CODEX_LITELLM_OK`를 반환해 **두 모델 모두 Codex CLI에서 정상 호출·전환**됨을 확인했습니다. 비-OpenAI 모델은 프로파일에 `[features] multi_agent = false`가 필요합니다(위 B-2 참고).
 
 ## 3. 요건
 
