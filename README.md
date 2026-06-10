@@ -61,7 +61,7 @@
 - `/model`로 Kimi·Grok·GLM 등 여러 Foundry 모델 전환
 - APIM 게이트웨이를 거친 운영 전환
 
-### 03c. Codex CLI에서 Foundry 모델 호출
+### 03c. Codex CLI에서 Foundry 모델 호출 (실험/참고용)
 
 [문서 열기](docs/03c-codex-cli-foundry-integration.md)
 
