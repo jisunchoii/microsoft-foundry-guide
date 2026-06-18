@@ -59,6 +59,17 @@ Each document can be read independently, but for first-time adoption we recommen
 - Switching between multiple Foundry models such as Kimi, Grok, and GLM with `/model`
 - Moving to production through an APIM gateway
 
+### 03b1. Calling Databricks-Hosted Claude from Claude Code
+
+[Open document](docs/03b1-claude-code-databricks-integration.md)
+
+> Azure Databricks directly exposes an Anthropic-compatible serving endpoint (`/serving-endpoints/anthropic`), so unlike 03b, Claude Code connects directly without a LiteLLM conversion proxy.
+
+- Getting the Claude Code configuration from the portal's "Integrate external agents"
+- Connecting `ANTHROPIC_BASE_URL` directly to the Databricks serving endpoint
+- Applying the coding-agent-mode header (`x-databricks-use-coding-agent-mode`)
+- Switching between Databricks Claude models mapped to the opus/sonnet/haiku slots with `/model`
+
 ### 04. End-to-End API Call Governance Architecture
 
 [Open document](docs/04-api-governance-architecture.md)
@@ -73,7 +84,7 @@ Each document can be read independently, but for first-time adoption we recommen
 1. If the concepts are unfamiliar, start with [00. Concepts](docs/00-concepts.md).
 2. To follow along on screen, do the [Portal setup](docs/01-setup-portal.md); to verify automation, do the [CLI setup](docs/01-setup-cli.md).
 3. After deploying a model, verify direct calls in [API Calls](docs/02-api-calls.md).
-4. If you need developer-tool integration, proceed with the [Copilot integration](docs/03-copilot-foundry-integration.md) or the [Claude Code integration](docs/03b-claude-code-foundry-integration.md).
+4. If you need developer-tool integration, proceed with the [Copilot integration](docs/03-copilot-foundry-integration.md), the [Claude Code integration](docs/03b-claude-code-foundry-integration.md), or the [Claude Code + Databricks integration](docs/03b1-claude-code-databricks-integration.md).
 5. When moving to production, consolidate the call paths with the [APIM governance architecture](docs/04-api-governance-architecture.md).
 
 ## Authoring notes
