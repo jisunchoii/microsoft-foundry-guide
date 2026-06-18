@@ -21,3 +21,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# 로컬 참고용 메모 (커밋 안 함)
+_local-*.html

@@ -61,6 +61,17 @@
 - `/model`로 Kimi·Grok·GLM 등 여러 Foundry 모델 전환
 - APIM 게이트웨이를 거친 운영 전환
 
+### 03b1. Claude Code에서 Databricks 호스팅 Claude 호출 
+
+[문서 열기](docs/03b1-claude-code-databricks-integration.md)
+
+> Azure Databricks가 Anthropic 호환 서빙 엔드포인트(`/serving-endpoints/anthropic`)를 직접 노출하므로, 03b와 달리 LiteLLM 변환 프록시 없이 Claude Code를 직결합니다.
+
+- 포털 "Integrate external agents"에서 Claude Code 설정 가져오기
+- `ANTHROPIC_BASE_URL`을 Databricks 서빙 엔드포인트로 직결
+- 코딩 에이전트 모드 헤더(`x-databricks-use-coding-agent-mode`) 적용
+- `/model`로 opus·sonnet·haiku 슬롯에 매핑된 Databricks Claude 전환
+
 ### 03c. Codex CLI에서 Foundry 모델 호출 (실험/참고용)
 
 [문서 열기](docs/03c-codex-cli-foundry-integration.md)
@@ -88,7 +99,7 @@
 1. 개념이 낯설다면 [00. 개념 소개](docs/00-concepts.md)부터 읽습니다.
 2. 화면으로 따라 하려면 [포털 셋업](docs/01-setup-portal.md), 자동화를 검증하려면 [CLI 셋업](docs/01-setup-cli.md)을 진행합니다.
 3. 모델 배포 후 [API 호출](docs/02-api-calls.md)에서 직접 호출을 확인합니다.
-4. 개발자 도구 연동이 필요하면 [Copilot 연동](docs/03-copilot-foundry-integration.md), [Claude Code 연동](docs/03b-claude-code-foundry-integration.md), [Codex CLI 연동](docs/03c-codex-cli-foundry-integration.md)을 진행합니다.
+4. 개발자 도구 연동이 필요하면 [Copilot 연동](docs/03-copilot-foundry-integration.md), [Claude Code 연동](docs/03b-claude-code-foundry-integration.md), [Claude Code + Databricks 연동](docs/03b1-claude-code-databricks-integration.md), [Codex CLI 연동](docs/03c-codex-cli-foundry-integration.md)을 진행합니다.
 5. 운영 전환 시 [APIM 거버넌스 아키텍처](docs/04-api-governance-architecture.md)로 호출 경로를 통합합니다.
 
 ## 작성 기준
