@@ -7,7 +7,7 @@
 - Foundry의 리소스, 프로젝트, 배포 개념 이해
 - 포털 또는 Azure CLI로 Foundry 리소스와 모델 배포 구성
 - API Key와 Microsoft Entra ID 방식으로 모델 호출 검증
-- VS Code Copilot Chat, GitHub Copilot CLI, Claude Code, Codex CLI에서 Foundry 모델 연결
+- VS Code Copilot Chat, GitHub Copilot CLI, Claude Code, Codex CLI, OpenCode에서 Foundry 모델 연결
 - APIM AI 게이트웨이로 앱과 개발자 도구 호출을 함께 거버닝
 
 ## 가이드 구성
@@ -85,6 +85,18 @@
 - 프로파일과 `/model`로 여러 Foundry 모델 전환
 - APIM 게이트웨이를 거친 운영 전환
 
+### 03d. OpenCode에서 Foundry 모델 호출
+
+[문서 열기](docs/03d-opencode-foundry-integration.md)
+
+> OpenCode 플러그인의 `fetch` 래퍼로 매 요청마다 Entra 토큰을 주입하므로, API 키를 디스크에 저장하지 않고 Azure CLI 세션 토큰으로 인증합니다.
+
+- Entra ID 토큰 자동 주입·갱신 (API Key 불필요, 401/403 시 강제 갱신 후 재시도)
+- Azure AI Foundry(OpenAI·open-weight)와 Azure Databricks 모델 서빙 동시 연결
+- provider별 토큰 리소스(audience)와 baseURL 경로 규칙 정리
+- GPT-5 계열 추론 모델 파라미터 제약을 `chat.params` 훅으로 처리
+- 서비스 주체·관리 ID 기반 장기 무인 운영 가이드
+
 ### 04. 전체 API 호출 거버닝 아키텍처
 
 [문서 열기](docs/04-api-governance-architecture.md)
@@ -99,7 +111,7 @@
 1. 개념이 낯설다면 [00. 개념 소개](docs/00-concepts.md)부터 읽습니다.
 2. 화면으로 따라 하려면 [포털 셋업](docs/01-setup-portal.md), 자동화를 검증하려면 [CLI 셋업](docs/01-setup-cli.md)을 진행합니다.
 3. 모델 배포 후 [API 호출](docs/02-api-calls.md)에서 직접 호출을 확인합니다.
-4. 개발자 도구 연동이 필요하면 [Copilot 연동](docs/03-copilot-foundry-integration.md), [Claude Code 연동](docs/03b-claude-code-foundry-integration.md), [Claude Code + Databricks 연동](docs/03b1-claude-code-databricks-integration.md), [Codex CLI 연동](docs/03c-codex-cli-foundry-integration.md)을 진행합니다.
+4. 개발자 도구 연동이 필요하면 [Copilot 연동](docs/03-copilot-foundry-integration.md), [Claude Code 연동](docs/03b-claude-code-foundry-integration.md), [Claude Code + Databricks 연동](docs/03b1-claude-code-databricks-integration.md), [Codex CLI 연동](docs/03c-codex-cli-foundry-integration.md), [OpenCode 연동](docs/03d-opencode-foundry-integration.md)을 진행합니다.
 5. 운영 전환 시 [APIM 거버넌스 아키텍처](docs/04-api-governance-architecture.md)로 호출 경로를 통합합니다.
 
 ## 작성 기준
